@@ -2,50 +2,63 @@ import streamlit as st
 import pandas as pd
 from db import get_all_companies, insert_company
 
+# Oldal konfiguráció
 st.set_page_config(page_title="Optitex ERP", layout="wide")
 
-# Egyedi stílus a "belesimuló" megjelenéshez
+# CSS a modern, belesimuló megjelenésért
 st.markdown("""
     <style>
-    .stMetric { background-color: #f0f2f6; padding: 10px; border-radius: 10px; }
+    .stMetric { background-color: #f0f2f6; padding: 15px; border-radius: 10px; }
+    .stAlert { margin-top: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
+# Navigáció
 st.sidebar.title("Navigáció")
 menu = st.sidebar.radio("Válassz:", ["Kezdőlap", "Ügyfélkezelő", "Új Ügyfél Felvétele"])
 
 if menu == "Kezdőlap":
     st.title("👗 Optitex Szerkesztő és Ügyfélkezelő")
-    st.write("Üdvözöllek! Ez a központi felület az üzleti folyamataidhoz.")
-    
+    st.markdown("Üdvözöllek! Ez a központi felület az üzleti folyamataidhoz.")
+    st.info("Navigálj a bal oldali menüben a kezdéshez.")
+
 elif menu == "Ügyfélkezelő":
     st.subheader("Ügyfél adatbázis")
     cegek = get_all_companies()
     
     if cegek:
         df = pd.DataFrame(cegek)
-        # Tisztítás: csak azokat mutatjuk, amiknek van neve
+        # Tisztítás: csak az érvényes névvel rendelkezőket mutatjuk
         df_clean = df[df['name'].notna() & (df['name'] != '')]
         
-        st.dataframe(df_clean.drop(columns=['id']), use_container_width=True)
-        
-        st.write("---")
-        selected_name = st.selectbox("Részletek megtekintése:", df_clean['name'].unique())
-        
-        c = next(item for item in cegek if item["name"] == selected_name)
-        
-        # Grid megjelenítés
-        col1, col2 = st.columns(2)
-        col1.metric("Cég neve", c['name'])
-        col2.write(f"**Adószám:** {c.get('tax_number', 'Nincs megadva')}")
-        st.write(f"**Cím:** {c.get('address', 'Nincs megadva')}")
-        
-        # Extra adatok elegáns megjelenítése
-        if c.get('extra_data'):
-            st.subheader("Egyéb adatok")
-            for key, val in c['extra_data'].items():
-                if val: # Csak akkor írjuk ki, ha nem üres
-                    st.info(f"**{key}:** {val}")
+        if not df_clean.empty:
+            st.dataframe(df_clean.drop(columns=['id']), use_container_width=True)
+            
+            st.write("---")
+            selected_name = st.selectbox("Részletek megtekintése:", df_clean['name'].unique())
+            
+            # Biztonságos találatkeresés
+            talalatok = [item for item in cegek if item["name"] == selected_name]
+            
+            if talalatok:
+                c = talalatok[0]
+                
+                # Grid megjelenítés
+                col1, col2 = st.columns(2)
+                col1.metric("Cég neve", c['name'])
+                col2.write(f"**Adószám:** {c.get('tax_number', 'Nincs megadva')}")
+                st.write(f"**Cím:** {c.get('address', 'Nincs megadva')}")
+                
+                # Extra adatok dinamikus megjelenítése
+                if c.get('extra_data') and isinstance(c['extra_data'], dict):
+                    st.subheader("Egyéb adatok")
+                    for key, val in c['extra_data'].items():
+                        if val: 
+                            st.info(f"**{key}:** {val}")
+            else:
+                st.warning("Nem található adat a kiválasztott céghez.")
+        else:
+            st.warning("Még nincsenek érvényes ügyfelek az adatbázisban.")
     else:
         st.warning("Még nincsenek rögzített cégek.")
 
