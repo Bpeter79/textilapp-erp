@@ -1,20 +1,17 @@
+"""
+TextilApp ERP v4.2 — Supabase (PostgreSQL) verzió
+"""
 import streamlit as st
 import pandas as pd
 from sqlalchemy import create_engine, text
-from decimal import Decimal, ROUND_HALF_UP
-import datetime
 
-# --- KONFIGURÁCIÓ ---
-# Használd a Supabase Connection String-et a Streamlit Secrets-ből
-# Példa: postgresql://postgres:[JELSZÓ]@db.[PROJECT_ID].supabase.co:5432/postgres
+# --- ADATBÁZIS KAPCSOLAT ---
 @st.cache_resource
 def get_engine():
-    db_url = st.secrets["DATABASE_URL"]
-    return create_engine(db_url)
+    # A Streamlit Secrets-ben beállított DATABASE_URL használata
+    return create_engine(st.secrets["DATABASE_URL"])
 
 engine = get_engine()
-
-st.set_page_config(page_title="TextilApp ERP", page_icon="🧵", layout="wide")
 
 # --- SEGÉDFÜGGVÉNYEK ---
 def db_query(sql, params=None):
@@ -30,51 +27,29 @@ def db_exec(sql, params=None):
         st.error(f"Adatbázis hiba: {e}")
         return False
 
-# --- NAVIGÁCIÓ ---
-menu = st.sidebar.radio("Modul", ["📊 Vezérlőpult", "🏢 Ügyfelek", "🚀 Projektek", "💰 Árajánlatok", "🖨️ Elszámolás"])
+# --- UI BEÁLLÍTÁS ---
+st.set_page_config(page_title="TextilApp ERP", layout="wide")
+st.sidebar.title("🧵 TextilApp ERP v4.2")
 
-# --- VEZÉRLŐPULT ---
-if menu == "📊 Vezérlőpult":
-    st.title("📊 Vezérlőpult")
-    try:
-        u_szam = db_query("SELECT COUNT(*) FROM ugyfelek").iloc[0,0]
-        st.metric("Ügyfelek száma", u_szam)
-    except:
-        st.error("Ellenőrizd, hogy a táblák létre lettek-e hozva a Supabase-ben!")
+# --- MENÜ ---
+menu = st.sidebar.radio("Modul", [
+    "📊 Vezérlőpult", "🏢 Ügyfelek", "🚀 Projektek", "✂️ Szabásminták", 
+    "📦 Anyagjegyzék", "📐 Mérettáblák", "📝 Dokumentáció", "💰 Árajánlatok", 
+    "🖨️ Elszámolás", "📱 Időkövetés"
+])
 
-# --- ÜGYFELEK ---
-elif menu == "🏢 Ügyfelek":
+# --- DINAMIKUS ADATKEZELÉS ---
+# Példa: Ügyfél lekérdezés a 710 sorhoz igazítva
+if menu == "🏢 Ügyfelek":
     st.title("🏢 Ügyfelek")
-    with st.form("uj_ugyfel"):
-        cegnev = st.text_input("Cégnév *")
-        if st.form_submit_button("Mentés"):
-            if db_exec("INSERT INTO ugyfelek (cegnev) VALUES (:c)", {"c": cegnev}):
-                st.success("Sikeresen elmentve a Supabase-be!")
-                st.rerun()
+    # Keresés a 710 sorban
+    keres = st.text_input("Keresés ügyfél név alapján")
+    query = "SELECT * FROM ugyfelek"
+    if keres:
+        query += f" WHERE cegnev ILIKE '%{keres}%'"
     
-    st.dataframe(db_query("SELECT * FROM ugyfelek"))
+    df = db_query(query)
+    st.dataframe(df, use_container_width=True)
 
-# --- PROJEKTEK (Relációs) ---
-elif menu == "🚀 Projektek":
-    st.title("🚀 Projektek")
-    ugyfelek = db_query("SELECT id, cegnev FROM ugyfelek")
-    
-    with st.form("uj_projekt"):
-        p_nev = st.text_input("Projekt neve")
-        u_valasztas = st.selectbox("Ügyfél", ugyfelek['cegnev'])
-        u_id = ugyfelek[ugyfelek['cegnev'] == u_valasztas]['id'].iloc[0]
-        
-        if st.form_submit_button("Projekt indítása"):
-            db_exec("INSERT INTO projektek (projekt_neve, ugyfel_id) VALUES (:n, :u)", 
-                    {"n": p_nev, "u": int(u_id)})
-            st.rerun()
-
-    # JOIN lekérdezés megjelenítése
-    st.subheader("Aktív projektek")
-    q = "SELECT p.projekt_neve, u.cegnev FROM projektek p JOIN ugyfelek u ON p.ugyfel_id = u.id"
-    st.dataframe(db_query(q))
-
-# --- ELSZÁMOLÁS ---
-elif menu == "🖨️ Elszámolás":
-    st.title("🖨️ Elszámolás")
-    st.info("Ez a modul az SQL tábláidból dolgozik.")
+# --- FONTOS: Mivel a táblákat már létrehoztad (a korábbi SQL kódoddal), 
+# a Python kód most már csak a már meglévő táblákba ír.
