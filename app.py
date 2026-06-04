@@ -238,4 +238,4 @@ if menu == "📱 Időkövetés":
         st.metric("Összes óra", f"{df['munkaora'].sum():.1f}")
         st.bar_chart(df.groupby("projekt_szam")["munkaora"].sum())
         st.dataframe(df)
-``
+
