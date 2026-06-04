@@ -1,0 +1,13 @@
+# Adatbázisok
+*.db
+*.sqlite3
+
+# Titkos fájlok
+.streamlit/secrets.toml
+.env
+
+# Környezeti fájlok
+__pycache__/
+.DS_Store
+venv/
+.venv/
