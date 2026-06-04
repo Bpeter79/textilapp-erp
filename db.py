@@ -7,7 +7,7 @@ def get_db_client():
 
 supabase = get_db_client()
 
-# --- ALAP LEKÉRDEZÉSEK ---
+# --- LEKÉRDEZÉSEK ---
 def get_companies():
     return supabase.table("companies").select("*").order("company_name").execute().data
 
@@ -23,14 +23,16 @@ def get_patterns_by_company(company_id):
 def get_quotes_by_company(company_id):
     return supabase.table("quotes").select("*").eq("company_id", company_id).execute().data
 
-# --- ELszÁMOLÁS LEKÉRDEZÉSEK ---
 def get_settlements_by_company(company_id):
     return supabase.table("settlements").select("*").eq("company_id", company_id).order("settlement_number", desc=True).execute().data
 
-def get_settlement_items(settlement_id):
-    return supabase.table("settlement_items").select("*").eq("settlement_id", settlement_id).execute().data
+def get_all_settlement_items():
+    return supabase.table("settlement_items").select("*").execute().data
 
-# --- REKORD BESZÚRÁSOK ---
+def get_settlement_items(settlement_id):
+    return supabase.table("settlement_items").select("*").eq("settlement_id", settlement_id).order("created_at").execute().data
+
+# --- BESZÚRÁSOK ---
 def insert_company(data):
     return supabase.table("companies").insert(data).execute()
 
@@ -51,3 +53,16 @@ def insert_settlement(data):
 
 def insert_settlement_item(data):
     return supabase.table("settlement_items").insert(data).execute()
+
+# --- MÓDOSÍTÁSOK ÉS TÖRLÉSEK (ÚJ) ---
+def update_settlement(settlement_id, data):
+    return supabase.table("settlements").update(data).eq("id", settlement_id).execute()
+
+def update_settlement_item(item_id, data):
+    return supabase.table("settlement_items").update(data).eq("id", item_id).execute()
+
+def delete_settlement(settlement_id):
+    return supabase.table("settlements").delete().eq("id", settlement_id).execute()
+
+def delete_settlement_item(item_id):
+    return supabase.table("settlement_items").delete().eq("id", item_id).execute()
