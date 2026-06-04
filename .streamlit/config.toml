@@ -1,8 +1,6 @@
-
 [theme]
-base = "light"
-primaryColor = "#0F62FE"
-backgroundColor = "#F7F9FC"
-secondaryBackgroundColor = "#FFFFFF"
-textColor = "#1F2937"
+primaryColor = "#00F2FF"           # Villanykék (Optitex technológiai vibe)
+backgroundColor = "#0E1117"        # Sötét, szemkímélő háttér
+secondaryBackgroundColor = "#1E252B" # Enyhén világosabb sávok
+textColor = "#E0E6ED"              # Lágy fehér/szürke szöveg
 font = "sans serif"
