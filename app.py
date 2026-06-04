@@ -108,41 +108,61 @@ if menu == "📊 Dashboard":
 # ============================================================
 
 if menu == "🏢 Ügyfelek":
-    st.title("Ügyfelek")
 
-    tab1, tab2 = st.tabs(["➕ Új", "🔍 Lista"])
+    st.title("🏢 Ügyfelek")
 
+    tab1, tab2 = st.tabs(["➕ Új ügyfél", "📋 Lista"])
+
+    # ======================================================
+    # ÚJ ÜGYFÉL
+    # ======================================================
     with tab1:
-        with st.form("ugyfel"):
-            cegnev = st.text_input("Cégnév *")
-            email = st.text_input("Email")
+        with st.form("ugyfel_form", clear_on_submit=True):
 
-            if st.form_submit_button("Mentés"):
-                if cegnev:
+            col1, col2 = st.columns(2)
+
+            cegnev = col1.text_input("Cégnév *")
+            email = col2.text_input("Email")
+
+            telefon = col1.text_input("Telefon")
+            weboldal = col2.text_input("Weboldal")
+
+            iparag = col1.text_input("Iparág")
+            fizetes = col2.text_input("Fizetési feltétel")
+
+            kedv = col1.number_input("Kedvezmény %", 0.0, 100.0, 0.0)
+
+            megjegyzes = st.text_area("Megjegyzés")
+
+            if st.form_submit_button("💾 Mentés"):
+
+                if not cegnev:
+                    st.error("Cégnév kötelező!")
+                else:
                     ok = db_exec("""
-                        INSERT INTO ugyfelek (cegnev, email)
-                        VALUES (:c,:e)
-                    """, {"c": sanitize(cegnev), "e": sanitize(email)})
+                        INSERT INTO ugyfelek
+                        (cegnev, email, telefon, weboldal,
+                         iparag, fizetesi_feltetel, kedvezmeny_pct, megjegyzes)
+                        VALUES
+                        (:c,:e,:t,:w,:i,:f,:k,:m)
+                    """, {
+                        "c": sanitize(cegnev),
+                        "e": sanitize(email),
+                        "t": sanitize(telefon),
+                        "w": sanitize(weboldal),
+                        "i": sanitize(iparag),
+                        "f": sanitize(fizetes),
+                        "k": float(kedv),
+                        "m": sanitize(megjegyzes)
+                    })
 
                     if ok:
-                        st.success("✅ mentve")
+                        st.success("✅ Ügyfél mentve!")
                         st.rerun()
-                else:
-                    st.error("Kötelező mező!")
 
-    with tab2:
-        keres = st.text_input("Keresés")
+    # ======================================================
+    # LISTA + KERESÉS
 
-        if keres:
-            df = db_query("""
-                SELECT cegnev, email
-                FROM ugyfelek
-                WHERE cegnev ILIKE :k
-            """, {"k": f"%{keres}%"})
-        else:
-            df = db_query("SELECT cegnev, email FROM ugyfelek")
-
-        st.dataframe(df, use_container_width=True)
 
 # ============================================================
 # PROJEKTEK
