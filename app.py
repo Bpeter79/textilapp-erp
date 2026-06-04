@@ -109,59 +109,173 @@ if menu == "📊 Dashboard":
 
 if menu == "🏢 Ügyfelek":
 
-    st.title("🏢 Ügyfelek")
+    st.title("🏢 Ügyfél kezelő központ")
 
-    tab1, tab2 = st.tabs(["➕ Új ügyfél", "📋 Lista"])
+    # ==========================================================
+    # TOP KPI
+    # ==========================================================
+    c1, c2, c3 = st.columns(3)
 
-    # ======================================================
-    # ÚJ ÜGYFÉL
-    # ======================================================
-    with tab1:
-        with st.form("ugyfel_form", clear_on_submit=True):
+    def scalar(q):
+        df = db_query(q)
+        return df.iloc[0, 0] if not df.empty else 0
+
+    c1.metric("📊 Ügyfelek száma", scalar("SELECT COUNT(*) FROM ugyfelek"))
+
+    c2.metric("💰 Össz bevétel",
+        f"{int(scalar('SELECT COALESCE(SUM(brutto_ft),0) FROM elszamolasok')):,} Ft"
+    )
+
+    c3.metric("📁 Aktív projektek",
+        scalar("SELECT COUNT(*) FROM projektek WHERE statusz = 'folyamatban'")
+    )
+
+    st.markdown("---")
+
+    # ==========================================================
+    # SZŰRÉS + KERESÉS
+    # ==========================================================
+    col1, col2 = st.columns(2)
+
+    keres = col1.text_input("🔍 Keresés cégnévre")
+    iparag_filter = col2.selectbox(
+        "Iparág szűrés",
+        ["Összes"] + get_list("ugyfelek", "iparag")
+    )
+
+    query = "SELECT * FROM ugyfelek WHERE 1=1"
+
+    params = {}
+
+    if keres:
+        query += " AND cegnev ILIKE :k"
+        params["k"] = f"%{keres}%"
+
+    if iparag_filter != "Összes":
+        query += " AND iparag = :i"
+        params["i"] = iparag_filter
+
+    query += " ORDER BY cegnev"
+
+    df = db_query(query, params)
+
+    # ==========================================================
+    # KÁRTYÁS NÉZET
+    # ==========================================================
+    st.subheader("📇 Ügyfél lista")
+
+    if not df.empty:
+
+        for i in range(0, len(df), 2):
+            cols = st.columns(2)
+
+            for col, (_, row) in zip(cols, df.iloc[i:i+2].iterrows()):
+
+                ceg = row["cegnev"]
+                email = row.get("email", "")
+                telefon = row.get("telefon", "")
+                iparag = row.get("iparag", "")
+                fizetes = row.get("fizetesi_feltetel", "")
+
+                with col:
+                    st.markdown(f"""
+                    ### 🏢 {ceg}
+                    **📧 Email:** {email or '-'}  
+                    **📞 Telefon:** {telefon or '-'}  
+                    **🏭 Iparág:** {iparag or '-'}  
+                    **💳 Fizetés:** {fizetes or '-'}
+                    """)
+
+                    # ügyfél KPI
+                    proj = scalar(f"""
+                        SELECT COUNT(*) FROM projektek
+                        WHERE ugyfel_neve = '{ceg}'
+                    """)
+
+                    bev = scalar(f"""
+                        SELECT COALESCE(SUM(brutto_ft),0)
+                        FROM elszamolasok
+                        WHERE ugyfel_neve = '{ceg}'
+                    """)
+
+                    ora = scalar(f"""
+                        SELECT COALESCE(SUM(munkaora),0)
+                        FROM idokovetes
+                        WHERE ugyfel_neve = '{ceg}'
+                    """)
+
+                    st.caption(f"📁 Projektek: {proj}")
+                    st.caption(f"💰 Bevétel: {int(bev):,} Ft")
+                    st.caption(f"⏱️ Munkaórák: {float(ora):.1f} h")
+
+                    if st.button(f"Részletek – {ceg}", key=f"btn_{ceg}"):
+                        st.session_state["selected_customer"] = ceg
+
+                    st.markdown("---")
+
+    else:
+        st.info("Nincs találat.")
+
+    # ==========================================================
+    # RÉSZLET NÉZET
+    # ==========================================================
+    if "selected_customer" in st.session_state:
+
+        ceg = st.session_state["selected_customer"]
+
+        st.markdown("## 🔎 Ügyfél részletek")
+        st.write(f"**Kiválasztva:** {ceg}")
+
+        adat = db_query("""
+            SELECT * FROM ugyfelek WHERE cegnev = :c
+        """, {"c": ceg})
+
+        if not adat.empty:
+            r = adat.iloc[0]
 
             col1, col2 = st.columns(2)
 
-            cegnev = col1.text_input("Cégnév *")
-            email = col2.text_input("Email")
+            col1.write(f"📧 Email: {r.get('email','-')}")
+            col1.write(f"📞 Telefon: {r.get('telefon','-')}")
+            col1.write(f"🌐 Web: {r.get('weboldal','-')}")
 
-            telefon = col1.text_input("Telefon")
-            weboldal = col2.text_input("Weboldal")
+            col2.write(f"🏭 Iparág: {r.get('iparag','-')}")
+            col2.write(f"💳 Fizetés: {r.get('fizetesi_feltetel','-')}")
+            col2.write(f"💸 Kedvezmény: {r.get('kedvezmeny_pct',0)} %")
 
-            iparag = col1.text_input("Iparág")
-            fizetes = col2.text_input("Fizetési feltétel")
+        # projektek
+        st.subheader("📁 Projektek")
+        st.dataframe(db_query("""
+            SELECT projekt_szam, projekt_neve, statusz
+            FROM projektek
+            WHERE ugyfel_neve = :c
+        """, {"c": ceg}))
 
-            kedv = col1.number_input("Kedvezmény %", 0.0, 100.0, 0.0)
+        # elszámolások
+        st.subheader("💰 Elszámolások")
+        st.dataframe(db_query("""
+            SELECT elsz_szam, brutto_ft, kiallitas
+            FROM elszamolasok
+            WHERE ugyfel_neve = :c
+        """, {"c": ceg}))
 
-            megjegyzes = st.text_area("Megjegyzés")
+        # idő grafikon
+        st.subheader("⏱️ Munkaórák")
 
-            if st.form_submit_button("💾 Mentés"):
+        ido = db_query("""
+            SELECT datum, munkaora
+            FROM idokovetes
+            WHERE ugyfel_neve = :c
+        """, {"c": ceg})
 
-                if not cegnev:
-                    st.error("Cégnév kötelező!")
-                else:
-                    ok = db_exec("""
-                        INSERT INTO ugyfelek
-                        (cegnev, email, telefon, weboldal,
-                         iparag, fizetesi_feltetel, kedvezmeny_pct, megjegyzes)
-                        VALUES
-                        (:c,:e,:t,:w,:i,:f,:k,:m)
-                    """, {
-                        "c": sanitize(cegnev),
-                        "e": sanitize(email),
-                        "t": sanitize(telefon),
-                        "w": sanitize(weboldal),
-                        "i": sanitize(iparag),
-                        "f": sanitize(fizetes),
-                        "k": float(kedv),
-                        "m": sanitize(megjegyzes)
-                    })
+        if not ido.empty:
+            ido["datum"] = pd.to_datetime(ido["datum"])
+            st.line_chart(ido.set_index("datum"))
 
-                    if ok:
-                        st.success("✅ Ügyfél mentve!")
-                        st.rerun()
+        if st.button("❌ Bezár"):
+            del st.session_state["selected_customer"]
+            st.rerun()
 
-    # ======================================================
-    # LISTA + KERESÉS
 
 
 # ============================================================
