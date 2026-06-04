@@ -1,39 +1,38 @@
 import streamlit as st
-import pandas as pd
-from db import get_all_companies, get_contacts_by_company # Ezeket a függvényeket a db.py-ban kiegészítettük
+from db import get_all_companies, insert_company, insert_project
 
-st.set_page_config(page_title="Optitex Pro ERP", layout="wide")
+st.set_page_config(page_title="Optitex ERP", layout="wide")
+st.sidebar.title("Navigáció")
+menu = st.sidebar.radio("Válassz:", ["Ügyfélközpont", "Új Ügyfél felvitele", "Új Projekt felvitele"])
 
-menu = st.sidebar.radio("Navigáció", ["Ügyfélközpont", "Új Ügyfél/Projekt felvitele"])
-
+# --- ÜGYFÉLKÖZPONT ---
 if menu == "Ügyfélközpont":
     st.title("🏢 Ügyfélközpont")
+    # Itt jelenítsd meg a cégek listáját...
+
+# --- ÚJ ÜGYFÉL ---
+elif menu == "Új Ügyfél felvitele":
+    st.title("➕ Új Ügyfél rögzítése")
+    with st.form("uj_ceg"):
+        n = st.text_input("Cég neve")
+        t = st.text_input("Adószám")
+        a = st.text_area("Cím")
+        if st.form_submit_button("Cég mentése"):
+            insert_company(n, t, a)
+            st.success("Cég rögzítve!")
+
+# --- ÚJ PROJEKT ---
+elif menu == "Új Projekt felvitele":
+    st.title("🚀 Új Projekt indítása")
     cegek = get_all_companies()
+    ceg_dict = {c['name']: c['id'] for c in cegek}
     
-    if cegek:
-        # Ügyfélválasztó
-        ceg_nevek = [c['name'] for c in cegek]
-        selected_name = st.selectbox("Válassz ügyfelet:", ceg_nevek)
-        c = next(item for item in cegek if item['name'] == selected_name)
+    with st.form("uj_projekt"):
+        sel_ceg = st.selectbox("Válassz ügyfelet:", list(ceg_dict.keys()))
+        p_name = st.text_input("Projekt neve")
+        stat = st.selectbox("Állapot", ["Tervezés", "Folyamatban", "Kész"])
+        dead = st.date_input("Határidő")
         
-        # Grid megjelenítés
-        tab1, tab2, tab3 = st.tabs(["Cég adatok", "Kapcsolattartók", "Projektek"])
-        
-        with tab1:
-            st.metric("Cégnév", c['name'])
-            st.write(f"**Adószám:** {c.get('tax_number')}")
-            st.write(f"**Székhely:** {c.get('address')}")
-            
-        with tab2:
-            st.subheader("Kapcsolattartók")
-            kontakto = get_contacts_by_company(c['id'])
-            if kontakto:
-                st.table(pd.DataFrame(kontakto))
-            else:
-                st.info("Nincs rögzítve kapcsolattartó.")
-                
-        with tab3:
-            st.subheader("Aktív Projektek")
-            # Ide jöhet a projektek lekérdezése...
-    else:
-        st.warning("Még nincsenek cégek az adatbázisban.")
+        if st.form_submit_button("Projekt mentése"):
+            insert_project(ceg_dict[sel_ceg], p_name, stat, str(dead))
+            st.success("Projekt rögzítve!")
